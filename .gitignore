@@ -5,6 +5,15 @@
 *.so
 *.dylib
 
+# Other.
+*.txt
+*.png
+*.jpg
+*.log
+
+# Local files.
+local
+
 # Test binary, built with `go test -c`
 *.test
 
