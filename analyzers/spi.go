@@ -1,12 +1,36 @@
 package analyzers
 
-import "github.com/soypat/saleae"
+import (
+	"math"
+
+	"github.com/soypat/saleae"
+)
 
 type TxSPI struct {
 	// a.k.a. MOSI.
 	SDO []byte
 	// a.k.a. MISO.
-	SDI []byte
+	SDI     []byte
+	timings []Interval
+}
+
+func (t TxSPI) StartTime() float64 {
+	if len(t.timings) < 1 {
+		return math.NaN()
+	}
+	return t.timings[0].start
+}
+
+func (t TxSPI) EndTime() float64 {
+	if len(t.timings) < 1 {
+		return math.NaN()
+	}
+	return t.timings[len(t.timings)-1].end
+}
+
+type Interval struct {
+	start float64
+	end   float64
 }
 
 // SPI can be used to analyze a digital signal for SPI transactions. For now
@@ -21,8 +45,10 @@ func (*SPI) Scan(clock, enable, mosi, miso *saleae.DigitalFile) (txs []TxSPI, er
 	enableState := enable.Header.InitialState != 0
 
 	var (
+		timeStartForByte                 float64
 		currentMisoByte, currentMosiByte byte
 		misoBytes, mosiBytes             []byte
+		timings                          []Interval
 		startByteIdx, bitIdx             int
 	)
 	iclk := 0
@@ -43,8 +69,9 @@ func (*SPI) Scan(clock, enable, mosi, miso *saleae.DigitalFile) (txs []TxSPI, er
 			enableState = !enableState
 			if enableState && len(misoBytes[startByteIdx:]) > 0 {
 				txs = append(txs, TxSPI{
-					SDI: misoBytes[startByteIdx:],
-					SDO: mosiBytes[startByteIdx:],
+					SDI:     misoBytes[startByteIdx:],
+					SDO:     mosiBytes[startByteIdx:],
+					timings: timings[startByteIdx:],
 				})
 				startByteIdx = len(misoBytes)
 				currentMisoByte = 0
@@ -64,11 +91,15 @@ func (*SPI) Scan(clock, enable, mosi, miso *saleae.DigitalFile) (txs []TxSPI, er
 			tMosi = mosi.Data[mosiLast]
 			mosiState = !mosiState
 		}
-
+		if bitIdx == 0 {
+			timeStartForByte = t
+		}
 		currentMisoByte |= b2u8(misoState) << (7 - byte(bitIdx))
 		currentMosiByte |= b2u8(mosiState) << (7 - byte(bitIdx))
+
 		bitIdx++
 		if bitIdx%8 == 0 {
+			timings = append(timings, Interval{start: timeStartForByte, end: t})
 			misoBytes = append(misoBytes, currentMisoByte)
 			mosiBytes = append(mosiBytes, currentMosiByte)
 			currentMisoByte = 0
@@ -78,8 +109,9 @@ func (*SPI) Scan(clock, enable, mosi, miso *saleae.DigitalFile) (txs []TxSPI, er
 	}
 	if len(misoBytes[startByteIdx:]) > 0 {
 		txs = append(txs, TxSPI{
-			SDI: misoBytes[startByteIdx:],
-			SDO: mosiBytes[startByteIdx:],
+			SDI:     misoBytes[startByteIdx:],
+			SDO:     mosiBytes[startByteIdx:],
+			timings: timings[startByteIdx:],
 		})
 	}
 	return txs, nil
