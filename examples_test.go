@@ -4,12 +4,33 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
 	"github.com/soypat/saleae"
 	"github.com/soypat/saleae/analyzers"
 )
+
+func ExampleReadCaptureFile() {
+	startprog := time.Now()
+	defer func() {
+		fmt.Fprintln(os.Stderr, "elapsed:", time.Since(startprog))
+	}()
+	cap, err := saleae.ReadCaptureFile("testdata/sx1278_pico.sal")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("capture time:", cap.CaptureStart.Format(time.Stamp))
+	for i := range cap.DigitalFiles {
+		fmt.Println("digital file version:", cap.DigitalFiles[i].Header.Info.Version)
+	}
+	//Output:
+	//capture time: Jun  4 23:18:12
+
+	// We get an error due to a bug in saleae's software? Getting version==1, expect 0
+	// Documentation says current version is 0. What gives?
+}
 
 func ExampleDigitalFile_spi() {
 	startprog := time.Now()

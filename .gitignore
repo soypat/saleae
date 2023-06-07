@@ -11,6 +11,7 @@
 *.jpg
 *.log
 
+.vscode
 # Local files.
 local
 
